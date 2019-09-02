@@ -1,2 +1,2 @@
 # hamster-tool
-Additional tools for the hamster-time-tracker
+This repo hosts additional tools for the [Hamster] time tracker "https://github.com/projecthamster/hamster". 
