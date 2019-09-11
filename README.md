@@ -1,6 +1,6 @@
 # hamster-tool
 
-This repo hosts additional tools for the [Hamster time tracker](https://github.com/projecthamster/hamster). 
+This repository hosts additional tools for the [Hamster time tracker](https://github.com/projecthamster/hamster). 
 
 Currently there is just one script called `htool` which performs data export and loading via XML or TSV intermediate files. The tool uses hamster's sqlite3 interface to hamster.db directly instead of using hamster's DBUS interface, thereby making it easier to work with more than one database.
 
