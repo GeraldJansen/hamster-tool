@@ -4,7 +4,7 @@ This repo hosts additional tools for the [Hamster time tracker](https://github.c
 
 Currently there is just one script called `htool` which performs data export and loading via XML or TSV intermediate files. The tool uses hamster's sqlite3 interface to hamster.db directly instead of using hamster's DBUS interface, thereby making it easier to work with more than one database.
 
-The major current feature of `htool` is the possibility of merging two databases by exporting from the first and loading into the second. For example, you could merge this year's activities from a DB from a second machine present in say ~/Dropbox/hamster.db into you current DB (~/.local/share/hamster-applet/hamster.db) like this:
+The major current feature of `htool` is the possibility of merging two databases by exporting from the first and loading into the second. For example, you could merge this year's activities from a DB from a second machine present in say \~/Dropbox/hamster.db into you current DB (\~/.local/share/hamster-applet/hamster.db) like this:
 
 `htool --db-dir ~/Dropbox export tsv 2019-01-01 $(date +%y-%m-%d) | htool --log INFO load tsv`
 
@@ -35,7 +35,7 @@ optional arguments:
   -h, --help            show this help message and exit
   -d DB_DIR, --db-dir DB_DIR
                         directory of hamster.db (default:
-                        /home/gjansen/.local/share/hamster-applet)
+                        ~/.local/share/hamster-applet)
   --log {DEBUG,INFO,WARNING,ERROR,CRITICAL}
                         set the logging level (default: WARNING)
 
@@ -54,8 +54,9 @@ NOTES:
 * For export, if start-date is missing, it will default to today. If end-date
   is missing, it will default to start-date.
 
-* For load, input activities which overlap existing activities are skipped
-  and logged as warnings. Use --log INFO to log added activities.
+* For load, exact duplicate activities are skipped, input activities which 
+  overlap existing activities are skipped and logged, and new activities are 
+  logged. Use --log INFO to get the message or omit --log for silent usage.
 ```
 
 
