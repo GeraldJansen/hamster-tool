@@ -52,7 +52,7 @@ Actions:
 
 NOTES:
 * Date format is YYYY-MM-DD. A "hamster day" starts at the time set in the
-  time tracking preferences (default 05:00) and ends one minute earlier the
+  time tracking preferences (default 05:30) and ends one minute earlier the
   next day.
 
 * For export, if start-date is missing, it will default to today. If end-date
