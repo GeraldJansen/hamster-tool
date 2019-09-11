@@ -19,7 +19,7 @@ Just download the `htool` script to a directory in your path and make sure it is
 
 You will need to have a recent Python3+GTK3 version of hamster git installed on your system (or virtual env).
 
-# Usage
+## Usage
 ```
 $ ./htool --help
 usage: htool [-h] [-d DB_DIR] [--log {DEBUG,INFO,WARNING,ERROR,CRITICAL}]
@@ -59,7 +59,7 @@ NOTES:
   logged. Use --log INFO to get the message or omit --log for silent usage.
 ```
 
-# Credits
+## Credits
 
 The data loading function was developed starting from the contribution of @DefteZ
 [here](https://github.com/projecthamster/hamster/pull/275).
