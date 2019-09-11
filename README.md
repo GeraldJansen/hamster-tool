@@ -59,4 +59,7 @@ NOTES:
   logged. Use --log INFO to get the message or omit --log for silent usage.
 ```
 
+# Credits
 
+The data loading function was developed starting from the contribution of @DefteZ
+[here](https://github.com/projecthamster/hamster/pull/275).
