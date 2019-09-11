@@ -1,0 +1,262 @@
+#!/usr/bin/env python3
+# - coding: utf-8 -
+
+# Copyright (C) 2019 Gerald Jansen <gjansen at ownmail.net>
+
+# This file is part of hamster-tool.
+
+# Hamster-tool is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# Project Hamster is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with Project Hamster.  If not, see <http://www.gnu.org/licenses/>.
+
+# This project contains modified code from Project Hamster
+# https://github.com/projecthamster/hamster.
+# Copyright (C) 2010 Matías Ribecky <matias at mribecky.com.ar>
+# Copyright (C) 2010-2012 Toms Bauģis <toms.baugis@gmail.com>
+# Copyright (C) 2012 Ted Smith <tedks at cs.umd.edu>
+
+'''A script to run hamster-time-tracker utilities from the command line.
+
+A python3 version of https://github.com/projecthamster/hamster must be
+installed on your system (or virtualenv).
+'''
+
+import sys, os
+import argparse
+import datetime as dt
+from xdg.BaseDirectory import xdg_data_home
+
+from hamster import reports
+from hamster.storage import db
+from hamster.lib import default_logger, Fact
+from hamster.lib.stuff import hamster_today
+
+from hamster.lib import i18n
+i18n.setup_i18n()
+usage = _("""
+Actions:
+* export tsv|xml [start-date [end-date]]: Export activities with the
+  specified format (default=tsv).
+
+* load tsv|xml [filename]: Import activities from stdin or a file with
+  the specified format.
+
+NOTES:
+* Date format is YYYY-MM-DD. A "hamster day" starts at the time set in the
+  time tracking preferences (default 05:00) and ends one minute earlier the
+  next day.
+
+* For export, if start-date is missing, it will default to today. If end-date
+  is missing, it will default to start-date.
+
+* For load, input activities which overlap existing activities are skipped
+  and logged as warnings. Use --log INFO to log added activities.
+
+""")
+
+logger = default_logger(__file__)
+
+
+def parse_dt(text):
+    return None if not text else dt.datetime.fromisoformat(text)
+
+def clip_seconds(datetime):
+    return datetime.replace(second=0, microsecond=0)
+
+
+class HamsterTool(object):
+    '''The main application.'''
+
+    def __init__(self, database_dir=None):
+        self.db_storage = db.Storage(database_dir=database_dir)
+
+
+    def export(self, *args):
+        '''Use hamster CLI's own export functions'''
+
+        if not args:
+            sys.exit(usage)
+        export_format = args[0].lower()
+        if export_format not in ['tsv', 'xml']:
+            sys.stderr.write(usage)
+            sys.exit('export format "%s" not supported' % export_format)
+        start_date = hamster_today() if len(args) < 2 \
+            else parse_dt(args[1]).date()
+        end_date = start_date if len(args) < 3 \
+            else parse_dt(args[2]).date()
+        facts = [Fact(activity=f['name'], category=f['category'],
+                  description=f['description'], tags=f['tags'],
+                  start_time=clip_seconds(f['start_time']),
+                  end_time=clip_seconds(f['end_time']))
+                 for f in self.db_storage.get_facts(start_date, end_date, '')]
+        reports.simple(facts, start_date, end_date, export_format)
+
+
+    def _load_xml(self, infile):
+        '''Read fact data from an xml file or stdin.'''
+
+        from xml.etree import ElementTree
+        fact_list = []
+        for node in ElementTree.parse(infile).iter():
+            if node.tag != 'activity':
+                continue
+            fact_list.append(node.attrib)
+        return fact_list
+
+
+    def _load_tsv(self, infile):
+        '''Read fact data from a tsv file or stdin.'''
+
+        fact_list = []
+        infile.readline() # skip header line
+        for line in infile:
+            row = line.rstrip().split('\t')
+            if len(row) < 3:
+                continue
+            fact_list.append(
+                dict(name=row[0], start_time=row[1], end_time=row[2],
+                     category='' if len(row) < 5 else row[4],
+                     description='' if len(row) < 6 else row[5],
+                     tags='' if len(row) < 7 else row[6]))
+        return fact_list
+
+
+    def load(self, *args):
+        '''Load facts from and external file.
+
+        The following incoming facts are logged but skipped:
+        - those with missing end_time or end_time <= start_time
+        - those which overlap a fact already in the database
+          (however, overlaps in incoming activities are not checked)
+        '''
+        if not args:
+            sys.exit(usage)
+        if len(args) < 2:
+            infile = sys.stdin
+        else:
+            # check and open filename if specified
+            if not os.path.exists(args[1]):
+                sys.stderr.write(usage)
+                sys.exit('file does not exist: ' + filename)
+            infile = open(args[1])
+        load_format = args[0].lower()
+        if load_format == 'tsv':
+            new_data = self._load_tsv(infile)
+        elif load_format == 'xml':
+            new_data = self._load_xml(infile)
+        else:
+            sys.exit('format "%s" is not supported' % (args[0]))
+        infile.close()
+
+        if not new_data:
+            sys.exit('No activities to import')
+
+        # do not assume input is already sorted by start_time
+        new_data.sort(key=lambda x: x['start_time'])
+
+        dt_min = parse_dt(new_data[0]['start_time']).date()
+        dt_max = parse_dt(new_data[-1]['end_time']
+                           or new_data[-1]['start_time']).date()
+        # get list of activities already in the database (sorted)
+        db_facts = \
+            [Fact(activity=f['name'], category=f['category'],
+                  description=f['description'], tags=f['tags'],
+                  start_time=clip_seconds(f['start_time']),
+                  end_time=clip_seconds(f['end_time']))
+             for f in self.db_storage.get_facts(dt_min, dt_max, '')]
+        logger.debug('interval %s to %s has %d db_facts' \
+                     % (dt_min, dt_max, len(db_facts)))
+
+        # process new incoming facts in order of start_time
+        # -- compare to facts already present in the database
+        # -- avoid all-to-all comparison by tracking position in db_facts
+        db_index = 0
+        for f in new_data: # f is fact as dict
+
+            tags = [] if not f['tags'] \
+                else [tag.strip() for tag in f['tags'].split(',')]
+            new_fact = Fact(activity=f['name'], category=f['category'],
+                  description=f['description'], tags=tags,
+                  start_time=parse_dt(f['start_time']),
+                  end_time=parse_dt(f['end_time']))
+            logger.debug('-')
+            logger.debug('new:    "%s"' % (new_fact))
+
+            if not f['end_time']: # skip import of ongoing tasks
+                logger.info('SKIPPED "%s". NO END_TIME.'% (new_fact))
+                continue
+            if f['end_time'] < f['start_time']:
+                logger.info('SKIPPED "%s". BAD END_TIME.' % (new_fact))
+                continue
+
+            # add non-overlapping to DB
+            start_new = clip_seconds(new_fact.start_time)
+            end_new = clip_seconds(new_fact.end_time)
+            overlap = False
+            for i in range(db_index, len(db_facts)):
+                old_fact = db_facts[i]
+                start_old = old_fact.start_time
+                end_old = old_fact.end_time
+                logger.debug('old %3d "%s"' % (i, old_fact))
+                if end_new <= start_old:
+                    break
+                if start_new >= end_old:
+                    db_index += 1
+                    continue
+                if (start_new >= start_old or end_new <= end_old) \
+                   or (start_new < start_old and end_new > end_old):
+                    if (new_fact.serialized() == old_fact.serialized()):
+                        logger.debug('SKIPPED  "%s" DUPLICATE' % new_fact)
+                    else:
+                        logger.info('SKIPPED  "%s". OVERLAPS OLD "%s"'
+                                    % (new_fact, old_fact))
+
+                    overlap = True
+                    break
+            if not overlap:
+                logger.info('Added    "%s"' % (new_fact))
+                self.db_storage.add_fact(new_fact.serialized_name(),
+                                         new_fact.start_time,
+                                         new_fact.end_time)
+
+
+if __name__ == '__main__':
+
+
+    parser = argparse.ArgumentParser(
+        description='Extra tools for Hamster time tracker',
+        epilog=usage,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+
+    parser.add_argument('-d', '--db-dir',
+                        default=os.path.join(xdg_data_home, 'hamster-applet'),
+                        help='directory of hamster.db (default: %(default)s)')
+    # cf. https://stackoverflow.com/a/28611921/3565696
+    parser.add_argument('--log', dest='log_level',
+                        choices=('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'),
+                        default='WARNING',
+                        help='set the logging level (default: %(default)s)')
+    parser.add_argument('action', nargs='?', choices=('export', 'load'),
+                        help='action to perform')
+    parser.add_argument('action_args', nargs=argparse.REMAINDER, default=[])
+
+    args = parser.parse_args()
+
+    # logger for current script
+    logger.setLevel(args.log_level)
+
+    hamster_tool = HamsterTool(database_dir=args.db_dir)
+
+    if hasattr(hamster_tool, args.action):
+        getattr(hamster_tool, args.action)(*args.action_args)
+    else:
+        sys.exit(usage % {'prog': sys.argv[0]})
