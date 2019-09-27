@@ -4,7 +4,7 @@ This repository hosts additional tools for the [Hamster time tracker](https://gi
 
 Currently there is just one script called `htool` which performs data export and loading via XML or TSV intermediate files. The tool uses hamster's sqlite3 interface to hamster.db directly instead of using hamster's DBUS interface, thereby making it easier to work with more than one database.
 
-The major current feature of `htool` is the possibility of merging two databases by exporting from the first and loading into the second. For example, you could merge this year's activities from a DB from a second machine present in say \~/Dropbox/hamster.db into you current DB (\~/.local/share/hamster-applet/hamster.db) like this:
+The major current feature of `htool` is the possibility of merging two databases by exporting from the first and loading into the second. For example, you could merge this year's activities from a DB from a second machine present in say \~/Dropbox/hamster.db into your current DB (\~/.local/share/hamster-applet/hamster.db) like this:
 
 `htool --db-dir ~/Dropbox export tsv 2019-01-01 $(date +%y-%m-%d) | htool --log INFO load tsv`
 
