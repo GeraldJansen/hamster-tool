@@ -173,8 +173,6 @@ class HamsterTool(object):
         # -- avoid all-to-all comparison by tracking position in db_facts
         db_index = 0
         for f in new_data: # f is fact as dict
-
-            print('f dict:', f)
             tags = [] if not f['tags'] \
                 else [tag.strip() for tag in f['tags'].split(',')]
             new_fact = Fact(activity=f['name'], category=f['category'],
