@@ -32,13 +32,14 @@ installed on your system (or virtualenv).
 
 import sys, os
 import argparse
-import datetime as dt
 from xdg.BaseDirectory import xdg_data_home
 
 from hamster import reports
 from hamster.storage import db
 from hamster.lib import default_logger, Fact
 from hamster.lib.stuff import hamster_today
+from hamster.lib import datetime as dt
+
 
 from hamster.lib import i18n
 i18n.setup_i18n()
@@ -58,10 +59,10 @@ NOTES:
 * For export, if start-date is missing, it will default to today. If end-date
   is missing, it will default to start-date.
 
-* For load, exact duplicate activities are skipped, input activities which 
-  overlap existing activities are skipped and logged, and new activities are 
+* For load, exact duplicate activities are skipped, input activities which
+  overlap existing activities are skipped and logged, and new activities are
   logged. Use --log INFO to get the message or omit --log for silent usage.
-  
+
 """)
 
 logger = default_logger(__file__)
@@ -79,7 +80,7 @@ class HamsterTool(object):
 
     def __init__(self, database_dir=None):
         self.db_storage = db.Storage(database_dir=database_dir)
-
+        self.log_level = log_level
 
     def export(self, *args):
         '''Use hamster CLI's own export functions'''
@@ -94,11 +95,7 @@ class HamsterTool(object):
             else parse_dt(args[1]).date()
         end_date = start_date if len(args) < 3 \
             else parse_dt(args[2]).date()
-        facts = [Fact(activity=f['name'], category=f['category'],
-                  description=f['description'], tags=f['tags'],
-                  start_time=clip_seconds(f['start_time']),
-                  end_time=clip_seconds(f['end_time']))
-                 for f in self.db_storage.get_facts(start_date, end_date, '')]
+        facts = self.db_storage.get_facts(start_date, end_date, '')
         reports.simple(facts, start_date, end_date, export_format)
 
 
@@ -168,12 +165,7 @@ class HamsterTool(object):
         dt_max = parse_dt(new_data[-1]['end_time']
                            or new_data[-1]['start_time']).date()
         # get list of activities already in the database (sorted)
-        db_facts = \
-            [Fact(activity=f['name'], category=f['category'],
-                  description=f['description'], tags=f['tags'],
-                  start_time=clip_seconds(f['start_time']),
-                  end_time=clip_seconds(f['end_time']))
-             for f in self.db_storage.get_facts(dt_min, dt_max, '')]
+        db_facts = self.db_storage.get_facts(dt_min, dt_max, '')
         logger.debug('interval %s to %s has %d db_facts' \
                      % (dt_min, dt_max, len(db_facts)))
 
@@ -183,17 +175,18 @@ class HamsterTool(object):
         db_index = 0
         for f in new_data: # f is fact as dict
 
+            print('f dict:', f)
             tags = [] if not f['tags'] \
                 else [tag.strip() for tag in f['tags'].split(',')]
             new_fact = Fact(activity=f['name'], category=f['category'],
                   description=f['description'], tags=tags,
-                  start_time=parse_dt(f['start_time']),
-                  end_time=parse_dt(f['end_time']))
+                  start=parse_dt(f['start_time']),
+                  end=parse_dt(f['end_time']))
             logger.debug('-')
             logger.debug('new:    "%s"' % (new_fact))
 
             if not f['end_time']: # skip import of ongoing tasks
-                logger.info('SKIPPED "%s". NO END_TIME.'% (new_fact))
+                logger.info('SKIPPED "%s". NO END_TIME.' % (new_fact))
                 continue
             if f['end_time'] < f['start_time']:
                 logger.info('SKIPPED "%s". BAD END_TIME.' % (new_fact))
@@ -215,8 +208,8 @@ class HamsterTool(object):
                     continue
                 if (start_new >= start_old or end_new <= end_old) \
                    or (start_new < start_old and end_new > end_old):
-                    if (new_fact.serialized() == old_fact.serialized()):
-                        logger.debug('SKIPPED  "%s" DUPLICATE' % new_fact)
+                    if (new_fact == old_fact):
+                        logger.debug('SKIPPED  "%s" DUPLICATE' % (new_fact))
                     else:
                         logger.info('SKIPPED  "%s". OVERLAPS OLD "%s"'
                                     % (new_fact, old_fact))
