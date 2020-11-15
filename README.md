@@ -1,6 +1,6 @@
 # hamster-tool
 
-This repository hosts additional tools for the [Hamster time tracker](https://github.com/projecthamster/hamster). 
+This repository hosts additional tools for the [Hamster time tracker](https://github.com/projecthamster/hamster).
 
 Currently there is just one script called `htool` which performs data export and loading via XML or TSV intermediate files. The tool uses hamster's sqlite3 interface to hamster.db directly instead of using hamster's DBUS interface, thereby making it easier to work with more than one database.
 
@@ -15,9 +15,9 @@ Identical entries present in both databases will be silently skipped. Other inco
 
 ## Installation
 
-Just download the `htool` script to a directory in your path and make sure it is executable. 
+Just download the `htool` script to a directory in your path and make sure it is executable.
 
-You will need to have a recent Python3+GTK3 version of hamster git installed on your system (or virtual env).
+You will need to have Hamster v3.02 or later installed on your system (or virtual env).
 
 ## Usage
 ```
@@ -54,8 +54,8 @@ NOTES:
 * For export, if start-date is missing, it will default to today. If end-date
   is missing, it will default to start-date.
 
-* For load, exact duplicate activities are skipped, input activities which 
-  overlap existing activities are skipped and logged, and new activities are 
+* For load, exact duplicate activities are skipped, input activities which
+  overlap existing activities are skipped and logged, and new activities are
   logged. Use --log INFO to get the message or omit --log for silent usage.
 ```
 
