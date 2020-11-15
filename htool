@@ -80,7 +80,6 @@ class HamsterTool(object):
 
     def __init__(self, database_dir=None):
         self.db_storage = db.Storage(database_dir=database_dir)
-        self.log_level = log_level
 
     def export(self, *args):
         '''Use hamster CLI's own export functions'''
